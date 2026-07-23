@@ -78,3 +78,34 @@ App runs at `http://localhost:3000`.
 > environment — a bare `npm install` hits an unrelated npm/arborist peer-set
 > resolution bug on the base Nuxt scaffold. Worth re-checking against a
 > newer npm outside this environment.
+
+## Testing
+
+```bash
+npm run test        # unit tests (Vitest) — Pinia store logic
+npm run test:watch  # unit tests, watch mode
+npm run test:e2e    # E2E (Playwright) — canvas interactions in a real browser
+npm run typecheck   # nuxt typecheck (vue-tsc)
+```
+
+- `tests/unit/canvas-store.spec.ts` — the Pinia store (`app/stores/canvas.ts`)
+  covers the actual product logic: seeding, selection, adding each node type,
+  image/email mutation, cascading node delete (removes touching edges),
+  duplicate/self-loop edge prevention, position updates. 20 cases.
+- `tests/e2e/canvas.spec.ts` — drives the running app in Chromium: node click
+  → findings panel, seam click → coherence finding, pane click clears
+  selection, add URL, paste email, delete cascades edges, drag repositions a
+  node, and a console-error smoke check. 8 cases.
+- `npm run typecheck` is a real gate, not a formality: it caught a
+  `structuredClone`d state array sharing references across store instances
+  (fixed — state factory now deep-clones) and forced `FunnelNode`/`FunnelEdge`
+  off Vue Flow's `Node<T>`/`Edge<T>` generics (self-referential and blew up
+  TS's instantiation depth once wrapped in a Pinia store) in favor of plain,
+  structurally-compatible interfaces in `app/stores/canvas.ts`.
+
+**Not covered yet, and shouldn't be until the backend exists**: anything
+involving real network calls (capture, scoring), persistence, or auth — all
+still mocked/stubbed. Component-level unit tests (as opposed to store logic
+and E2E) are intentionally skipped for now — the E2E suite already exercises
+every interactive component through real DOM events, which is higher-signal
+than testing them in isolation at this stage.

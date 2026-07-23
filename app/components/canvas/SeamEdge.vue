@@ -43,6 +43,8 @@ function onSelect() {
   <EdgeLabelRenderer>
     <div
       class="absolute pointer-events-auto cursor-pointer rounded-full"
+      data-testid="seam-dot"
+      :data-seam-id="id"
       :style="{
         transform: `translate(-50%, -50%) translate(${path[1]}px, ${path[2]}px)`,
         width: '18px',

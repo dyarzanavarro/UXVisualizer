@@ -1,9 +1,27 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { Edge, Node } from '@vue-flow/core'
 import type { AssetType, FunnelEdgeData, FunnelNodeData, SeamStatus } from '~/types/canvas'
 
-export type FunnelNode = Node<FunnelNodeData>
-export type FunnelEdge = Edge<FunnelEdgeData>
+// Deliberately not `Node<FunnelNodeData>` / `Edge<FunnelEdgeData>` from
+// @vue-flow/core: those generics are self-referential (Node's class/style
+// fields reference GraphNode<Data>, which extends Node again) and blow up
+// TS's instantiation depth once wrapped in a Pinia store's inferred return
+// type. <VueFlow :nodes :edges> only needs these fields structurally, so a
+// plain, non-recursive shape is both sufficient and safe to type-check.
+export interface FunnelNode {
+  id: string
+  type: AssetType
+  position: { x: number; y: number }
+  data: FunnelNodeData
+}
+
+export interface FunnelEdge {
+  id: string
+  source: string
+  target: string
+  type: 'seam'
+  data: FunnelEdgeData
+}
 
 type SelectionKind = 'node' | 'edge' | null
 
@@ -106,127 +124,148 @@ function nextId(prefix: string) {
   return `${prefix}_${Date.now()}_${idCounter}`
 }
 
-export const useCanvasStore = defineStore('canvas', {
-  state: () => ({
-    nodes: initialNodes as FunnelNode[],
-    edges: initialEdges as FunnelEdge[],
-    selectedKind: null as SelectionKind,
-    selectedId: null as string | null,
-    emailModalNodeId: null as string | null,
-  }),
+export const useCanvasStore = defineStore('canvas', () => {
+  const nodes = ref<FunnelNode[]>(structuredClone(initialNodes))
+  const edges = ref<FunnelEdge[]>(structuredClone(initialEdges))
+  const selectedKind = ref<SelectionKind>(null)
+  const selectedId = ref<string | null>(null)
+  const emailModalNodeId = ref<string | null>(null)
 
-  getters: {
-    selectedNode(state): FunnelNode | null {
-      if (state.selectedKind !== 'node') return null
-      return state.nodes.find((n) => n.id === state.selectedId) ?? null
-    },
-    selectedEdge(state): FunnelEdge | null {
-      if (state.selectedKind !== 'edge') return null
-      return state.edges.find((e) => e.id === state.selectedId) ?? null
-    },
-  },
+  const selectedNode = computed<FunnelNode | null>(() => {
+    if (selectedKind.value !== 'node') return null
+    return nodes.value.find((n) => n.id === selectedId.value) ?? null
+  })
 
-  actions: {
-    selectNode(id: string) {
-      this.selectedKind = 'node'
-      this.selectedId = id
-    },
-    selectEdge(id: string) {
-      this.selectedKind = 'edge'
-      this.selectedId = id
-    },
-    clearSelection() {
-      this.selectedKind = null
-      this.selectedId = null
-    },
+  const selectedEdge = computed<FunnelEdge | null>(() => {
+    if (selectedKind.value !== 'edge') return null
+    return edges.value.find((e) => e.id === selectedId.value) ?? null
+  })
 
-    addNode(type: AssetType) {
-      const id = nextId('n')
-      const defaults: Record<AssetType, { label: string; sub: string }> = {
-        url: { label: 'New URL', sub: 'Paste link, not analyzed' },
-        image: { label: 'New image', sub: 'Not analyzed yet' },
-        email: { label: 'New email', sub: 'Paste content →' },
-      }
-      const node: FunnelNode = {
+  function selectNode(id: string) {
+    selectedKind.value = 'node'
+    selectedId.value = id
+  }
+
+  function selectEdge(id: string) {
+    selectedKind.value = 'edge'
+    selectedId.value = id
+  }
+
+  function clearSelection() {
+    selectedKind.value = null
+    selectedId.value = null
+  }
+
+  function addNode(type: AssetType) {
+    const id = nextId('n')
+    const defaults: Record<AssetType, { label: string; sub: string }> = {
+      url: { label: 'New URL', sub: 'Paste link, not analyzed' },
+      image: { label: 'New image', sub: 'Not analyzed yet' },
+      email: { label: 'New email', sub: 'Paste content →' },
+    }
+    const node: FunnelNode = {
+      id,
+      type,
+      position: { x: 100 + Math.random() * 300, y: 380 + Math.random() * 80 },
+      data: {
         id,
         type,
-        position: { x: 100 + Math.random() * 300, y: 380 + Math.random() * 80 },
-        data: {
-          id,
-          type,
-          label: defaults[type].label,
-          sub: defaults[type].sub,
-          score: null,
-          imageSrc: null,
-          emailText: null,
-          findings: [],
-        },
-      }
-      this.nodes.push(node)
-      return id
-    },
+        label: defaults[type].label,
+        sub: defaults[type].sub,
+        score: null,
+        imageSrc: null,
+        emailText: null,
+        findings: [],
+      },
+    }
+    nodes.value.push(node)
+    return id
+  }
 
-    setNodeImage(id: string, dataUrl: string, fileName: string) {
-      const node = this.nodes.find((n) => n.id === id)
-      if (!node) return
-      node.data.imageSrc = dataUrl
-      node.data.sub = fileName
-    },
+  function setNodeImage(id: string, dataUrl: string, fileName: string) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (!node) return
+    node.data.imageSrc = dataUrl
+    node.data.sub = fileName
+  }
 
-    openEmailModal(id: string) {
-      this.emailModalNodeId = id
-    },
-    closeEmailModal() {
-      this.emailModalNodeId = null
-    },
-    saveEmail(text: string) {
-      const id = this.emailModalNodeId
-      if (!id) return
-      const node = this.nodes.find((n) => n.id === id)
-      if (node) {
-        node.data.emailText = text
-        node.data.sub = text.split('\n')[0]?.slice(0, 40) || 'Pasted email'
-      }
-      this.emailModalNodeId = null
-    },
+  function openEmailModal(id: string) {
+    emailModalNodeId.value = id
+  }
 
-    deleteNode(id: string) {
-      this.nodes = this.nodes.filter((n) => n.id !== id)
-      this.edges = this.edges.filter((e) => e.source !== id && e.target !== id)
-      if (this.selectedId === id) this.clearSelection()
-    },
+  function closeEmailModal() {
+    emailModalNodeId.value = null
+  }
 
-    deleteEdge(id: string) {
-      this.edges = this.edges.filter((e) => e.id !== id)
-      if (this.selectedId === id) this.clearSelection()
-    },
+  function saveEmail(text: string) {
+    const id = emailModalNodeId.value
+    if (!id) return
+    const node = nodes.value.find((n) => n.id === id)
+    if (node) {
+      node.data.emailText = text
+      node.data.sub = text.split('\n')[0]?.slice(0, 40) || 'Pasted email'
+    }
+    emailModalNodeId.value = null
+  }
 
-    connect(sourceId: string, targetId: string) {
-      if (sourceId === targetId) return
-      const exists = this.edges.some(
-        (e) => (e.source === sourceId && e.target === targetId) || (e.source === targetId && e.target === sourceId),
-      )
-      if (exists) return
-      const id = nextId('e')
-      const edge: FunnelEdge = {
+  function deleteNode(id: string) {
+    nodes.value = nodes.value.filter((n) => n.id !== id)
+    edges.value = edges.value.filter((e) => e.source !== id && e.target !== id)
+    if (selectedId.value === id) clearSelection()
+  }
+
+  function deleteEdge(id: string) {
+    edges.value = edges.value.filter((e) => e.id !== id)
+    if (selectedId.value === id) clearSelection()
+  }
+
+  function connect(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return
+    const exists = edges.value.some(
+      (e) => (e.source === sourceId && e.target === targetId) || (e.source === targetId && e.target === sourceId),
+    )
+    if (exists) return
+    const id = nextId('e')
+    const edge: FunnelEdge = {
+      id,
+      source: sourceId,
+      target: targetId,
+      type: 'seam',
+      data: {
         id,
-        source: sourceId,
-        target: targetId,
-        type: 'seam',
-        data: {
-          id,
-          from: sourceId,
-          to: targetId,
-          status: 'unanalyzed' as SeamStatus,
-          findings: [{ type: 'not_yet_analyzed', severity: 'none', text: 'Run analysis to score this seam.' }],
-        },
-      }
-      this.edges.push(edge)
-    },
+        from: sourceId,
+        to: targetId,
+        status: 'unanalyzed' as SeamStatus,
+        findings: [{ type: 'not_yet_analyzed', severity: 'none', text: 'Run analysis to score this seam.' }],
+      },
+    }
+    edges.value.push(edge)
+  }
 
-    updateNodePosition(id: string, position: { x: number; y: number }) {
-      const node = this.nodes.find((n) => n.id === id)
-      if (node) node.position = position
-    },
-  },
+  function updateNodePosition(id: string, position: { x: number; y: number }) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (node) node.position = position
+  }
+
+  return {
+    nodes,
+    edges,
+    selectedKind,
+    selectedId,
+    emailModalNodeId,
+    selectedNode,
+    selectedEdge,
+    selectNode,
+    selectEdge,
+    clearSelection,
+    addNode,
+    setNodeImage,
+    openEmailModal,
+    closeEmailModal,
+    saveEmail,
+    deleteNode,
+    deleteEdge,
+    connect,
+    updateNodePosition,
+  }
 })

@@ -17,7 +17,7 @@ function verdictColor(verdict: string) {
 </script>
 
 <template>
-  <div class="w-80 border-l border-neutral-800 bg-neutral-900 p-4 overflow-y-auto">
+  <div class="w-80 border-l border-neutral-800 bg-neutral-900 p-4 overflow-y-auto" data-testid="side-panel">
     <div v-if="!store.selectedNode && !store.selectedEdge" class="text-sm text-neutral-500 mt-8 text-center">
       Click a node or seam to see findings.
       <br /><br />
