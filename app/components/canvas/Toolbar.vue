@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { Link2, Mail, Play, Upload } from '@lucide/vue'
+import { Link2, Loader2, Mail, Play, Upload } from '@lucide/vue'
 import { useCanvasStore } from '~/stores/canvas'
+import { useRunAnalysis } from '~/composables/useRunAnalysis'
 
 const store = useCanvasStore()
+const { run, running } = useRunAnalysis()
 const fileInput = ref<HTMLInputElement | null>(null)
 const pendingImageNodeId = ref<string | null>(null)
 
 function addUrlNode() {
-  store.addNode('url')
+  const id = store.addNode('url')
+  store.openUrlModal(id)
 }
 
 function triggerImageUpload() {
@@ -50,8 +53,14 @@ function addEmailNode() {
       <button class="flex items-center gap-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-100 px-3 py-1.5 rounded-md transition" @click="addEmailNode">
         <Mail :size="13" /> Paste email
       </button>
-      <button class="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-md transition font-medium ml-2">
-        <Play :size="13" /> Run analysis
+      <button
+        class="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-md transition font-medium ml-2"
+        :disabled="running"
+        @click="run"
+      >
+        <Loader2 v-if="running" :size="13" class="animate-spin" />
+        <Play v-else :size="13" />
+        {{ running ? 'Analyzing…' : 'Run analysis' }}
       </button>
     </div>
   </div>

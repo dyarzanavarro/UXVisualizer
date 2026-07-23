@@ -38,6 +38,10 @@ const initialNodes: FunnelNode[] = [
       score: 78,
       imageSrc: null,
       emailText: null,
+      url: 'https://mybacs.ch',
+      extractedText: null,
+      analyzing: false,
+      analysisError: null,
       findings: [
         { id: 'PC-035', verdict: 'present', text: 'Trustpilot 4.6 badge + press logos build immediate authority.' },
         { id: 'PC-072', verdict: 'absent_where_expected', text: 'No guarantee/risk-reversal signal on this page.' },
@@ -56,6 +60,10 @@ const initialNodes: FunnelNode[] = [
       score: 84,
       imageSrc: null,
       emailText: null,
+      url: 'https://mybacs.ch/products/dailybacs-women',
+      extractedText: null,
+      analyzing: false,
+      analysisError: null,
       findings: [
         { id: 'PC-072', verdict: 'present', text: '60-day money-back guarantee, explicit refund-or-credit choice.' },
         { id: 'PC-041', verdict: 'present', text: 'Honest "not suitable for pregnant/breastfeeding" disclosure.' },
@@ -74,6 +82,10 @@ const initialNodes: FunnelNode[] = [
       score: 71,
       imageSrc: null,
       emailText: null,
+      url: 'https://mybacs.ch/cart',
+      extractedText: null,
+      analyzing: false,
+      analysisError: null,
       findings: [
         { id: 'VA-09', verdict: 'present', text: 'Trustpilot stars carried through into cart.' },
       ],
@@ -92,6 +104,8 @@ const initialEdges: FunnelEdge[] = [
       from: 'n1',
       to: 'n2',
       status: 'break',
+      analyzing: false,
+      analysisError: null,
       findings: [
         {
           type: 'promise_unfulfilled',
@@ -111,6 +125,8 @@ const initialEdges: FunnelEdge[] = [
       from: 'n2',
       to: 'n3',
       status: 'ok',
+      analyzing: false,
+      analysisError: null,
       findings: [
         { type: 'confirmed', severity: 'none', text: 'Trust signals carry through cleanly into cart.' },
       ],
@@ -130,6 +146,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const selectedKind = ref<SelectionKind>(null)
   const selectedId = ref<string | null>(null)
   const emailModalNodeId = ref<string | null>(null)
+  const urlModalNodeId = ref<string | null>(null)
 
   const selectedNode = computed<FunnelNode | null>(() => {
     if (selectedKind.value !== 'node') return null
@@ -175,6 +192,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         score: null,
         imageSrc: null,
         emailText: null,
+        url: null,
+        extractedText: null,
+        analyzing: false,
+        analysisError: null,
         findings: [],
       },
     }
@@ -187,6 +208,32 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return
     node.data.imageSrc = dataUrl
     node.data.sub = fileName
+  }
+
+  function openUrlModal(id: string) {
+    urlModalNodeId.value = id
+  }
+
+  function closeUrlModal() {
+    urlModalNodeId.value = null
+  }
+
+  function saveUrl(url: string) {
+    const id = urlModalNodeId.value
+    if (!id) return
+    const node = nodes.value.find((n) => n.id === id)
+    if (node) {
+      node.data.url = url
+      node.data.label = (() => {
+        try {
+          return new URL(url).hostname
+        } catch {
+          return url
+        }
+      })()
+      node.data.sub = url
+    }
+    urlModalNodeId.value = null
   }
 
   function openEmailModal(id: string) {
@@ -236,6 +283,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         from: sourceId,
         to: targetId,
         status: 'unanalyzed' as SeamStatus,
+        analyzing: false,
+        analysisError: null,
         findings: [{ type: 'not_yet_analyzed', severity: 'none', text: 'Run analysis to score this seam.' }],
       },
     }
@@ -247,12 +296,68 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (node) node.position = position
   }
 
+  function setNodeAnalyzing(id: string, analyzing: boolean) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (node) {
+      node.data.analyzing = analyzing
+      if (analyzing) node.data.analysisError = null
+    }
+  }
+
+  function setNodeCaptureResult(id: string, capture: { screenshot: string; text: string }) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (!node) return
+    node.data.imageSrc = capture.screenshot
+    node.data.extractedText = capture.text
+  }
+
+  function setNodeAnalysisResult(id: string, result: { score: number; findings: FunnelNodeData['findings'] }) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (!node) return
+    node.data.score = result.score
+    node.data.findings = result.findings
+    node.data.analyzing = false
+    node.data.analysisError = null
+  }
+
+  function setNodeAnalysisError(id: string, message: string) {
+    const node = nodes.value.find((n) => n.id === id)
+    if (!node) return
+    node.data.analyzing = false
+    node.data.analysisError = message
+  }
+
+  function setEdgeAnalyzing(id: string, analyzing: boolean) {
+    const edge = edges.value.find((e) => e.id === id)
+    if (edge) {
+      edge.data.analyzing = analyzing
+      if (analyzing) edge.data.analysisError = null
+    }
+  }
+
+  function setEdgeAnalysisResult(id: string, result: { status: SeamStatus; findings: FunnelEdgeData['findings'] }) {
+    const edge = edges.value.find((e) => e.id === id)
+    if (!edge) return
+    edge.data.status = result.status
+    edge.data.findings = result.findings
+    edge.data.analyzing = false
+    edge.data.analysisError = null
+  }
+
+  function setEdgeAnalysisError(id: string, message: string) {
+    const edge = edges.value.find((e) => e.id === id)
+    if (!edge) return
+    edge.data.analyzing = false
+    edge.data.analysisError = message
+  }
+
   return {
     nodes,
     edges,
     selectedKind,
     selectedId,
     emailModalNodeId,
+    urlModalNodeId,
     selectedNode,
     selectedEdge,
     selectNode,
@@ -260,6 +365,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     clearSelection,
     addNode,
     setNodeImage,
+    openUrlModal,
+    closeUrlModal,
+    saveUrl,
     openEmailModal,
     closeEmailModal,
     saveEmail,
@@ -267,5 +375,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     deleteEdge,
     connect,
     updateNodePosition,
+    setNodeAnalyzing,
+    setNodeCaptureResult,
+    setNodeAnalysisResult,
+    setNodeAnalysisError,
+    setEdgeAnalyzing,
+    setEdgeAnalysisResult,
+    setEdgeAnalysisError,
   }
 })

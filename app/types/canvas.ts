@@ -17,6 +17,12 @@ export interface FunnelNodeData {
   imageSrc: string | null
   emailText: string | null
   findings: NodeFinding[]
+  /** The page address to capture (url nodes only). */
+  url: string | null
+  /** Extracted page copy from Playwright capture (url nodes only). */
+  extractedText: string | null
+  analyzing: boolean
+  analysisError: string | null
 }
 
 export type SeamStatus = 'ok' | 'break' | 'unanalyzed'
@@ -45,4 +51,6 @@ export interface FunnelEdgeData {
   to: string
   status: SeamStatus
   findings: SeamFinding[]
+  analyzing: boolean
+  analysisError: string | null
 }

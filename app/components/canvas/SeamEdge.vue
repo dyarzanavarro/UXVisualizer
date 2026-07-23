@@ -24,7 +24,11 @@ const path = computed(() =>
   }),
 )
 
-const color = computed(() => edgeColor(props.data!.status))
+const color = computed(() => {
+  if (props.data!.analyzing) return '#60a5fa'
+  if (props.data!.analysisError) return '#d9603a'
+  return edgeColor(props.data!.status)
+})
 const dash = computed(() => (props.data!.status === 'unanalyzed' ? '2,4' : '5,5'))
 
 function onSelect() {
@@ -43,6 +47,7 @@ function onSelect() {
   <EdgeLabelRenderer>
     <div
       class="absolute pointer-events-auto cursor-pointer rounded-full"
+      :class="{ 'animate-pulse': data!.analyzing }"
       data-testid="seam-dot"
       :data-seam-id="id"
       :style="{

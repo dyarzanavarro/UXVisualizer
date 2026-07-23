@@ -8,6 +8,7 @@ import SeamEdge from './SeamEdge.vue'
 import SidePanel from './SidePanel.vue'
 import Toolbar from './Toolbar.vue'
 import EmailModal from './EmailModal.vue'
+import UrlModal from './UrlModal.vue'
 
 const store = useCanvasStore()
 
@@ -71,5 +72,6 @@ function onNodeDragStop(event: { node: { id: string; position: { x: number; y: n
     </div>
 
     <EmailModal />
+    <UrlModal />
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, CheckCircle2, AlertTriangle, Trash2 } from '@lucide/vue'
+import { X, CheckCircle2, AlertTriangle, Loader2, Pencil, Trash2 } from '@lucide/vue'
 import { useCanvasStore } from '~/stores/canvas'
 
 const store = useCanvasStore()
@@ -31,13 +31,27 @@ function verdictColor(verdict: string) {
           <X :size="14" />
         </button>
       </div>
-      <div class="text-xs text-neutral-500 mb-4">{{ store.selectedNode.data.sub }}</div>
+      <div class="text-xs text-neutral-500 mb-1">{{ store.selectedNode.data.sub }}</div>
+      <button
+        v-if="store.selectedNode.data.type === 'url'"
+        class="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-300 mb-4"
+        @click="store.openUrlModal(store.selectedNode.id)"
+      >
+        <Pencil :size="10" /> {{ store.selectedNode.data.url ? 'Edit URL' : 'Set URL' }}
+      </button>
+      <div v-else class="mb-4" />
 
       <div v-if="store.selectedNode.data.emailText" class="text-xs text-neutral-400 bg-neutral-800 rounded p-2 mb-4 whitespace-pre-wrap max-h-32 overflow-y-auto">
         {{ store.selectedNode.data.emailText }}
       </div>
 
-      <template v-if="store.selectedNode.data.score !== null">
+      <div v-if="store.selectedNode.data.analyzing" class="flex items-center gap-2 text-xs text-neutral-400">
+        <Loader2 :size="12" class="animate-spin" /> Analyzing…
+      </div>
+      <div v-else-if="store.selectedNode.data.analysisError" class="text-xs text-[#d9603a] leading-relaxed">
+        {{ store.selectedNode.data.analysisError }}
+      </div>
+      <template v-else-if="store.selectedNode.data.score !== null">
         <div class="text-2xl font-mono font-semibold mb-4" :style="{ color: scoreColor(store.selectedNode.data.score) }">
           {{ store.selectedNode.data.score }}<span class="text-sm text-neutral-500">/100</span>
         </div>
@@ -59,7 +73,9 @@ function verdictColor(verdict: string) {
     <div v-if="store.selectedEdge">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-1.5 font-medium text-sm text-neutral-100">
-          <CheckCircle2 v-if="store.selectedEdge.data!.status === 'ok'" :size="14" color="#3fb88c" />
+          <Loader2 v-if="store.selectedEdge.data!.analyzing" :size="14" class="animate-spin text-neutral-400" />
+          <AlertTriangle v-else-if="store.selectedEdge.data!.analysisError" :size="14" color="#d9603a" />
+          <CheckCircle2 v-else-if="store.selectedEdge.data!.status === 'ok'" :size="14" color="#3fb88c" />
           <AlertTriangle v-else-if="store.selectedEdge.data!.status === 'break'" :size="14" color="#e3a008" />
           <span v-else class="w-3.5 h-3.5 rounded-full bg-neutral-600 inline-block" />
           Seam finding
@@ -73,7 +89,14 @@ function verdictColor(verdict: string) {
           </button>
         </div>
       </div>
-      <div class="space-y-3">
+
+      <div v-if="store.selectedEdge.data!.analyzing" class="flex items-center gap-2 text-xs text-neutral-400">
+        <Loader2 :size="12" class="animate-spin" /> Analyzing…
+      </div>
+      <div v-else-if="store.selectedEdge.data!.analysisError" class="text-xs text-[#d9603a] leading-relaxed">
+        {{ store.selectedEdge.data!.analysisError }}
+      </div>
+      <div v-else class="space-y-3">
         <div
           v-for="(f, i) in store.selectedEdge.data!.findings"
           :key="i"

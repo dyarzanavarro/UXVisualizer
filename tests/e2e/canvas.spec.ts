@@ -40,12 +40,27 @@ test('pane click clears the selection', async ({ page }) => {
   await expect(page.getByText('Click a node or seam')).toBeVisible()
 })
 
-test('Add URL creates a new unanalyzed node', async ({ page }) => {
+test('Add URL creates a node and opens the URL modal', async ({ page }) => {
   await page.getByRole('button', { name: 'Add URL' }).click()
-  await expect(page.getByText('New URL')).toBeVisible()
+  await expect(page.getByText('Funnel step URL')).toBeVisible()
 
-  await page.getByText('New URL').click()
+  await page.getByPlaceholder('https://example.com/checkout').fill('https://shop.example.com/pricing')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page.getByText('Funnel step URL')).toBeHidden()
+  await expect(page.getByText('shop.example.com', { exact: true })).toBeVisible()
+
+  await page.getByText('shop.example.com', { exact: true }).click()
   await expect(page.getByTestId('side-panel').getByText('Not analyzed yet.')).toBeVisible()
+})
+
+test('canceling the URL modal leaves the node as an unset placeholder', async ({ page }) => {
+  await page.getByRole('button', { name: 'Add URL' }).click()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+
+  await expect(page.getByText('New URL')).toBeVisible()
+  await page.getByText('New URL').click()
+  await expect(page.getByTestId('side-panel').getByText('Set URL')).toBeVisible()
 })
 
 test('Paste email creates a node and saves the pasted content', async ({ page }) => {
@@ -76,4 +91,72 @@ test('dragging a node updates its position', async ({ page }) => {
 
   const after = await node.boundingBox()
   expect(after!.x).not.toBeCloseTo(before!.x, 0)
+})
+
+test.describe('Run analysis (mocked backend)', () => {
+  // Real capture/scoring needs live network + an ANTHROPIC_API_KEY, neither
+  // available in CI/sandbox. These mock the three API routes at the browser
+  // network layer to validate the frontend orchestration (composable, store
+  // wiring, UI reactivity) independent of that - see README "Testing".
+
+  test('scores nodes and seams end-to-end', async ({ page }) => {
+    await page.route('**/api/capture', (route) =>
+      route.fulfill({ json: { screenshot: 'data:image/png;base64,AAAA', text: 'mock extracted copy' } }),
+    )
+    await page.route('**/api/analyze-node', (route) =>
+      route.fulfill({
+        json: {
+          score: 91,
+          findings: [{ id: 'PC-001', verdict: 'present', text: 'mock finding' }],
+          raw: {
+            step_id: 'mock',
+            findings: [{ pattern_id: 'PC-001', verdict: 'present', evidence: 'mock', confidence: 'high', suggested_fix: null }],
+          },
+        },
+      }),
+    )
+    await page.route('**/api/analyze-edge', (route) =>
+      route.fulfill({ json: { status: 'ok', findings: [{ type: 'confirmed', severity: 'none', text: 'mock: no discontinuities' }] } }),
+    )
+
+    await page.getByRole('button', { name: 'Run analysis' }).click()
+    await expect(page.getByRole('button', { name: 'Run analysis' })).toBeVisible({ timeout: 15_000 })
+
+    await page.getByText('Homepage').click()
+    const panel = page.getByTestId('side-panel')
+    await expect(panel.getByText('91')).toBeVisible()
+    await expect(panel.getByText('mock finding')).toBeVisible()
+
+    await page.mouse.click(500, 500)
+    await page.getByTestId('seam-dot').first().click({ force: true })
+    await expect(panel.getByText('mock: no discontinuities')).toBeVisible()
+  })
+
+  test('a failing node analysis is isolated - other nodes still complete', async ({ page }) => {
+    await page.route('**/api/capture', (route) => {
+      const body = route.request().postDataJSON() as { url: string }
+      if (body.url.includes('mybacs.ch/products')) {
+        return route.fulfill({ status: 502, json: { statusMessage: 'mock capture failure' } })
+      }
+      return route.fulfill({ json: { screenshot: 'data:image/png;base64,AAAA', text: 'mock copy' } })
+    })
+    await page.route('**/api/analyze-node', (route) =>
+      route.fulfill({ json: { score: 85, findings: [], raw: { step_id: 'mock', findings: [] } } }),
+    )
+    await page.route('**/api/analyze-edge', (route) =>
+      route.fulfill({ json: { status: 'ok', findings: [{ type: 'confirmed', severity: 'none', text: 'ok' }] } }),
+    )
+
+    await page.getByRole('button', { name: 'Run analysis' }).click()
+    await expect(page.getByRole('button', { name: 'Run analysis' })).toBeVisible({ timeout: 15_000 })
+
+    const panel = page.getByTestId('side-panel')
+
+    await page.getByText('Product page').click()
+    await expect(panel.getByText('mock capture failure')).toBeVisible()
+
+    await page.mouse.click(500, 500)
+    await page.getByText('Homepage').click()
+    await expect(panel.getByText('85')).toBeVisible()
+  })
 })

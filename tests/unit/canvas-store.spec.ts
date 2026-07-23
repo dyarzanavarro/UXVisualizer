@@ -206,4 +206,112 @@ describe('canvas store', () => {
     expect(store.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 999, y: 111 })
     expect(store.nodes.find((n) => n.id === 'n2')?.position).not.toEqual({ x: 999, y: 111 })
   })
+
+  describe('url modal flow', () => {
+    it('openUrlModal / saveUrl sets url, and derives label from the hostname', () => {
+      const store = useCanvasStore()
+      const id = store.addNode('url')
+
+      store.openUrlModal(id)
+      expect(store.urlModalNodeId).toBe(id)
+
+      store.saveUrl('https://shop.example.com/checkout')
+
+      const node = store.nodes.find((n) => n.id === id)
+      expect(node?.data.url).toBe('https://shop.example.com/checkout')
+      expect(node?.data.label).toBe('shop.example.com')
+      expect(node?.data.sub).toBe('https://shop.example.com/checkout')
+      expect(store.urlModalNodeId).toBeNull()
+    })
+
+    it('saveUrl without an open modal is a no-op', () => {
+      const store = useCanvasStore()
+      store.saveUrl('https://example.com')
+      expect(store.urlModalNodeId).toBeNull()
+    })
+
+    it('closeUrlModal discards without mutating the node', () => {
+      const store = useCanvasStore()
+      const id = store.addNode('url')
+      store.openUrlModal(id)
+      store.closeUrlModal()
+      expect(store.urlModalNodeId).toBeNull()
+      expect(store.nodes.find((n) => n.id === id)?.data.url).toBeNull()
+    })
+  })
+
+  describe('analysis state actions', () => {
+    it('setNodeAnalyzing toggles the flag and clears any prior error when starting', () => {
+      const store = useCanvasStore()
+      store.setNodeAnalysisError('n1', 'boom')
+
+      store.setNodeAnalyzing('n1', true)
+      expect(store.nodes.find((n) => n.id === 'n1')?.data.analyzing).toBe(true)
+      expect(store.nodes.find((n) => n.id === 'n1')?.data.analysisError).toBeNull()
+    })
+
+    it('setNodeCaptureResult stores the screenshot as imageSrc and the extracted text', () => {
+      const store = useCanvasStore()
+      store.setNodeCaptureResult('n1', { screenshot: 'data:image/png;base64,xyz', text: 'captured copy' })
+
+      const node = store.nodes.find((n) => n.id === 'n1')
+      expect(node?.data.imageSrc).toBe('data:image/png;base64,xyz')
+      expect(node?.data.extractedText).toBe('captured copy')
+    })
+
+    it('setNodeAnalysisResult sets score/findings and clears analyzing + error', () => {
+      const store = useCanvasStore()
+      store.setNodeAnalyzing('n1', true)
+
+      store.setNodeAnalysisResult('n1', { score: 91, findings: [{ id: 'PC-001', verdict: 'present', text: 'ok' }] })
+
+      const node = store.nodes.find((n) => n.id === 'n1')
+      expect(node?.data.score).toBe(91)
+      expect(node?.data.findings).toEqual([{ id: 'PC-001', verdict: 'present', text: 'ok' }])
+      expect(node?.data.analyzing).toBe(false)
+      expect(node?.data.analysisError).toBeNull()
+    })
+
+    it('setNodeAnalysisError clears analyzing and records the message', () => {
+      const store = useCanvasStore()
+      store.setNodeAnalyzing('n1', true)
+      store.setNodeAnalysisError('n1', 'capture failed')
+
+      const node = store.nodes.find((n) => n.id === 'n1')
+      expect(node?.data.analyzing).toBe(false)
+      expect(node?.data.analysisError).toBe('capture failed')
+    })
+
+    it('setEdgeAnalysisResult sets status/findings and clears analyzing + error', () => {
+      const store = useCanvasStore()
+      store.setEdgeAnalyzing('e1', true)
+
+      store.setEdgeAnalysisResult('e1', {
+        status: 'ok',
+        findings: [{ type: 'confirmed', severity: 'none', text: 'fine' }],
+      })
+
+      const edge = store.edges.find((e) => e.id === 'e1')
+      expect(edge?.data.status).toBe('ok')
+      expect(edge?.data.findings).toEqual([{ type: 'confirmed', severity: 'none', text: 'fine' }])
+      expect(edge?.data.analyzing).toBe(false)
+      expect(edge?.data.analysisError).toBeNull()
+    })
+
+    it('setEdgeAnalysisError clears analyzing and records the message', () => {
+      const store = useCanvasStore()
+      store.setEdgeAnalyzing('e1', true)
+      store.setEdgeAnalysisError('e1', 'both steps need analysis first')
+
+      const edge = store.edges.find((e) => e.id === 'e1')
+      expect(edge?.data.analyzing).toBe(false)
+      expect(edge?.data.analysisError).toBe('both steps need analysis first')
+    })
+
+    it('setNodeAnalyzing/setEdgeAnalyzing on an unknown id is a no-op, not a throw', () => {
+      const store = useCanvasStore()
+      expect(() => store.setNodeAnalyzing('does-not-exist', true)).not.toThrow()
+      expect(() => store.setEdgeAnalyzing('does-not-exist', true)).not.toThrow()
+    })
+  })
 })

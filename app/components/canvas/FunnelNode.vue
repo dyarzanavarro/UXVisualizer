@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
-import { Link2, Image as ImageIcon, Mail, Trash2 } from '@lucide/vue'
+import { Link2, Image as ImageIcon, Loader2, Mail, Trash2, TriangleAlert } from '@lucide/vue'
 import type { FunnelNodeData } from '~/types/canvas'
 import { useCanvasStore } from '~/stores/canvas'
 
@@ -39,7 +39,9 @@ function onDelete(e: MouseEvent) {
           <span class="text-[10px] uppercase tracking-wide">{{ data.type }}</span>
         </div>
         <div class="flex items-center gap-2">
-          <span v-if="data.score !== null" class="text-xs font-mono font-semibold" :style="{ color: scoreColor(data.score) }">{{ data.score }}</span>
+          <Loader2 v-if="data.analyzing" :size="12" class="animate-spin text-neutral-400" />
+          <TriangleAlert v-else-if="data.analysisError" :size="12" color="#d9603a" />
+          <span v-else-if="data.score !== null" class="text-xs font-mono font-semibold" :style="{ color: scoreColor(data.score) }">{{ data.score }}</span>
           <button class="opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-red-400 transition" @click="onDelete">
             <Trash2 :size="11" />
           </button>
