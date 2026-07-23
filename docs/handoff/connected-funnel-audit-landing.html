@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connected Funnel Audit — the seams, not just the pages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,450;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12161c;
+    --paper:#ece7d9;
+    --paper-dim:#b7b2a3;
+    --coherent:#3fb88c;
+    --break:#e3a008;
+    --break-red:#d9603a;
+    --line:#2a3038;
+    --panel:#181d24;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Inter', sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--coherent); color:var(--ink);}
+  a{color:inherit;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 32px;}
+  @media(max-width:640px){.wrap{padding:0 20px;}}
+
+  /* NAV */
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(18,22,28,0.88);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  nav .wrap{display:flex; align-items:center; justify-content:space-between; height:64px;}
+  .logo{font-family:'Fraunces', serif; font-size:1.15rem; font-weight:600; letter-spacing:-0.01em;}
+  .logo span{color:var(--coherent);}
+  nav .links{display:flex; gap:28px; font-size:0.88rem; color:var(--paper-dim);}
+  nav .links a:hover{color:var(--paper);}
+  .cta-btn{
+    background:var(--coherent); color:var(--ink); font-weight:600;
+    padding:9px 18px; border-radius:3px; font-size:0.85rem; text-decoration:none;
+    display:inline-block; transition:transform .15s ease, background .15s ease;
+  }
+  .cta-btn:hover{background:#5cd1a4; transform:translateY(-1px);}
+  .cta-btn.ghost{background:transparent; border:1px solid var(--line); color:var(--paper);}
+  .cta-btn.ghost:hover{border-color:var(--paper-dim); background:transparent;}
+  @media(max-width:760px){nav .links{display:none;}}
+
+  /* HERO */
+  header.hero{padding:96px 0 72px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; letter-spacing:0.08em;
+    color:var(--break); text-transform:uppercase; margin-bottom:22px; display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:''; width:7px; height:7px; background:var(--break); border-radius:50%; display:inline-block;}
+  h1{
+    font-family:'Fraunces', serif; font-weight:450; font-size:clamp(2.3rem, 5vw, 3.6rem);
+    line-height:1.06; letter-spacing:-0.015em; max-width:820px;
+  }
+  h1 em{font-style:italic; color:var(--coherent); font-weight:450;}
+  .sub{
+    margin-top:24px; font-size:1.12rem; color:var(--paper-dim); max-width:600px; line-height:1.6;
+  }
+  .hero-ctas{display:flex; gap:14px; margin-top:36px; flex-wrap:wrap;}
+
+  /* FUNNEL DIAGRAM — signature element */
+  .funnel-diagram{
+    margin-top:76px; position:relative;
+  }
+  .funnel-track{
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; position:relative;
+  }
+  .funnel-step{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:22px 20px 20px; position:relative; z-index:2;
+  }
+  .funnel-step .step-num{
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; color:var(--paper-dim);
+    letter-spacing:0.05em; text-transform:uppercase;
+  }
+  .funnel-step h3{font-family:'Fraunces', serif; font-size:1.15rem; font-weight:450; margin-top:6px;}
+  .funnel-step .price{
+    font-family:'IBM Plex Mono', monospace; font-size:1.4rem; margin-top:14px; color:var(--paper);
+  }
+  .funnel-step .price.flagged{color:var(--break);}
+  .funnel-step .detail{font-size:0.8rem; color:var(--paper-dim); margin-top:6px;}
+  .seam{
+    position:absolute; top:0; bottom:0; width:2px; z-index:1;
+  }
+  .seam-line{width:100%; height:100%; background:repeating-linear-gradient(to bottom, var(--break) 0 6px, transparent 6px 12px);}
+  .seam.ok .seam-line{background:repeating-linear-gradient(to bottom, var(--coherent) 0 6px, transparent 6px 12px);}
+  .seam-tag{
+    position:absolute; top:-34px; left:50%; transform:translateX(-50%);
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; white-space:nowrap;
+    background:var(--break); color:var(--ink); padding:4px 8px; border-radius:3px; font-weight:500;
+  }
+  .seam.ok .seam-tag{background:var(--coherent);}
+  .diagram-caption{
+    margin-top:20px; font-size:0.85rem; color:var(--paper-dim); font-family:'IBM Plex Mono', monospace;
+  }
+  @media(max-width:760px){
+    .funnel-track{grid-template-columns:1fr; gap:34px;}
+    .seam{display:none;}
+    .funnel-step::after{
+      content:'⌄'; position:absolute; bottom:-30px; left:50%; transform:translateX(-50%);
+      color:var(--break); font-size:1.2rem;
+    }
+    .funnel-step:last-child::after{display:none;}
+  }
+
+  section{padding:88px 0; border-top:1px solid var(--line);}
+  .section-head{max-width:640px; margin-bottom:52px;}
+  .kicker{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; color:var(--coherent);
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:14px;
+  }
+  h2{font-family:'Fraunces', serif; font-weight:450; font-size:clamp(1.7rem, 3vw, 2.3rem); letter-spacing:-0.01em;}
+  .section-head p{color:var(--paper-dim); margin-top:14px; font-size:1.02rem; line-height:1.65;}
+
+  /* PROBLEM — two column contrast */
+  .contrast{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:6px; overflow:hidden;}
+  .contrast > div{background:var(--panel); padding:32px;}
+  .contrast h4{font-family:'IBM Plex Mono', monospace; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:18px;}
+  .contrast .no h4{color:var(--break-red);}
+  .contrast .yes h4{color:var(--coherent);}
+  .contrast ul{list-style:none;}
+  .contrast li{padding:9px 0; border-bottom:1px solid var(--line); font-size:0.95rem; color:var(--paper-dim);}
+  .contrast li:last-child{border-bottom:none;}
+  .contrast .yes li{color:var(--paper);}
+  @media(max-width:760px){.contrast{grid-template-columns:1fr;}}
+
+  /* PROCESS */
+  .process{display:grid; grid-template-columns:repeat(3,1fr); gap:28px;}
+  .process-step{border-left:1px solid var(--line); padding-left:22px;}
+  .process-step .n{font-family:'Fraunces', serif; font-size:2.4rem; color:var(--line); line-height:1;}
+  .process-step h4{font-family:'Fraunces', serif; font-weight:450; font-size:1.15rem; margin:14px 0 8px;}
+  .process-step p{color:var(--paper-dim); font-size:0.92rem; line-height:1.6;}
+  @media(max-width:760px){.process{grid-template-columns:1fr; gap:36px;}}
+
+  /* FRAMEWORKS */
+  .framework-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+  .fw-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px;
+  }
+  .fw-card .tag{font-family:'IBM Plex Mono', monospace; font-size:0.7rem; color:var(--coherent); text-transform:uppercase; letter-spacing:0.04em;}
+  .fw-card h4{font-family:'Fraunces', serif; font-weight:450; margin:10px 0 6px; font-size:1.02rem;}
+  .fw-card p{color:var(--paper-dim); font-size:0.85rem; line-height:1.5;}
+  @media(max-width:900px){.framework-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.framework-grid{grid-template-columns:1fr;}}
+
+  /* SAMPLE FINDING */
+  .report-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:36px;
+    font-family:'IBM Plex Mono', monospace; font-size:0.88rem; line-height:1.75;
+  }
+  .report-card .rc-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:22px; flex-wrap:wrap; gap:10px;}
+  .rc-score{font-family:'Fraunces', serif; font-size:2.2rem; color:var(--break);}
+  .rc-label{color:var(--paper-dim); font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em;}
+  .rc-body p{color:var(--paper-dim); margin-bottom:14px;}
+  .rc-body .flag{color:var(--break); font-weight:500;}
+  .rc-body .ok{color:var(--coherent); font-weight:500;}
+
+  /* CTA */
+  .cta-section{text-align:center; padding:100px 0;}
+  .cta-section h2{max-width:600px; margin:0 auto;}
+  .cta-section p{max-width:480px; margin:18px auto 0; color:var(--paper-dim);}
+  .cta-section .hero-ctas{justify-content:center; margin-top:34px;}
+
+  footer{border-top:1px solid var(--line); padding:40px 0; font-size:0.82rem; color:var(--paper-dim);}
+  footer .wrap{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;}
+
+  .reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in{opacity:1; transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="logo">funnel<span>/</span>seams</div>
+    <div class="links">
+      <a href="#problem">The gap</a>
+      <a href="#process">How it works</a>
+      <a href="#frameworks">The rubric</a>
+      <a href="#sample">Sample finding</a>
+    </div>
+    <a href="#cta" class="cta-btn">Request an audit</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Journey Coherence Audit</div>
+    <h1>Every page passes.<br>The <em>seams</em> don't.</h1>
+    <p class="sub">Landing page audits, checkout heuristics, trust badges — all commoditized to the point of free AI prompt kits. What nobody checks is what breaks <em style="color:var(--paper); font-style:normal;">between</em> your steps: the price that shifts, the trust signal that vanishes, the promise that never gets confirmed.</p>
+    <div class="hero-ctas">
+      <a href="#cta" class="cta-btn">Request an audit</a>
+      <a href="#sample" class="cta-btn ghost">See a sample finding</a>
+    </div>
+
+    <div class="funnel-diagram reveal">
+      <div class="funnel-track">
+        <div class="funnel-step">
+          <div class="step-num">01 — Landing page</div>
+          <h3>3-month subscription banner</h3>
+          <div class="price">Free gift · 49.95 CHF</div>
+          <div class="detail">Headline promo, top of page</div>
+        </div>
+        <div class="seam">
+          <div class="seam-line"></div>
+          <div class="seam-tag">unconfirmed →</div>
+        </div>
+        <div class="funnel-step">
+          <div class="step-num">02 — Product page</div>
+          <h3>Plan selection</h3>
+          <div class="price flagged">Gift threshold · 140 CHF</div>
+          <div class="detail">Different mechanic, not cross-referenced</div>
+        </div>
+        <div class="seam ok">
+          <div class="seam-line"></div>
+          <div class="seam-tag">confirmed →</div>
+        </div>
+        <div class="funnel-step">
+          <div class="step-num">03 — Cart</div>
+          <h3>Checkout entry</h3>
+          <div class="price">Gift applied ✓</div>
+          <div class="detail">Trust badges present</div>
+        </div>
+      </div>
+      <div class="diagram-caption">// three real pages, individually fine — one unverified promise carried across the seam</div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">The gap</div>
+      <h2>Per-page audits are a solved problem. That's the issue.</h2>
+      <p>LIFT, Baymard, Cialdini — checked against any single page, for free, by a prompt kit. The differentiator isn't scoring pages harder. It's scoring the connections between them, where fragmentation actually happens.</p>
+    </div>
+    <div class="contrast reveal">
+      <div class="no">
+        <h4>What everyone already checks</h4>
+        <ul>
+          <li>Landing page heuristics, in isolation</li>
+          <li>Checkout friction, in isolation</li>
+          <li>Trust badges present or absent, per page</li>
+          <li>Generic "add urgency" recommendations</li>
+        </ul>
+      </div>
+      <div class="yes">
+        <h4>What gets missed every time</h4>
+        <ul>
+          <li>Does the price on step 1 match step 3?</li>
+          <li>Does trust build toward checkout, or reset?</li>
+          <li>Is every headline promise actually fulfilled downstream?</li>
+          <li>Does tone survive the handoff between teams/tools?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="process">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">How it works</div>
+      <h2>Three steps in. One coherence score out.</h2>
+    </div>
+    <div class="process reveal">
+      <div class="process-step">
+        <div class="n">01</div>
+        <h4>Capture</h4>
+        <p>Screenshot + copy extraction for each step of your real funnel — landing, product/plan, checkout.</p>
+      </div>
+      <div class="process-step">
+        <div class="n">02</div>
+        <h4>Score</h4>
+        <p>Each step scored against a tagged rubric — PsyConversion, VertrauensArchitektur, LIFT, Baymard, Cialdini — with cited evidence, not boilerplate.</p>
+      </div>
+      <div class="process-step">
+        <div class="n">03</div>
+        <h4>Diff the seams</h4>
+        <p>Adjacent steps compared directly for price, trust, tone and promise breaks invisible to any single-page review.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="frameworks">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">The rubric</div>
+      <h2>Not generic Cialdini. A tagged, cited pattern library.</h2>
+      <p>Every finding is traceable to a named pattern in a specific framework — not "consider adding urgency."</p>
+    </div>
+    <div class="framework-grid reveal">
+      <div class="fw-card">
+        <div class="tag">131 patterns</div>
+        <h4>PsyConversion</h4>
+        <p>Behavior patterns tagged across the full customer journey — awareness through retention.</p>
+      </div>
+      <div class="fw-card">
+        <div class="tag">10 mechanisms</div>
+        <h4>VertrauensArchitektur</h4>
+        <p>Trust formation scored on continuity, benevolence and integrity — not just badge-counting.</p>
+      </div>
+      <div class="fw-card">
+        <div class="tag">Public framework</div>
+        <h4>LIFT Model</h4>
+        <p>Clarity, relevance, distraction, urgency, trust, anxiety — the baseline layer.</p>
+      </div>
+      <div class="fw-card">
+        <div class="tag">Public framework</div>
+        <h4>Baymard + Cialdini</h4>
+        <p>Checkout benchmarks and the six principles, applied where they're actually evidenced.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="sample">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="kicker">Sample finding</div>
+      <h2>What a seam-level finding actually looks like</h2>
+    </div>
+    <div class="report-card reveal">
+      <div class="rc-head">
+        <div>
+          <div class="rc-label">Seam: step 01 → step 02</div>
+          <div class="rc-score">62<span style="font-size:1rem; color:var(--paper-dim);">/100</span></div>
+        </div>
+        <div class="rc-label">Journey Coherence Score</div>
+      </div>
+      <div class="rc-body">
+        <p><span class="flag">[promise_unfulfilled — medium]</span> Homepage banner promises "free gift worth 49.95 CHF" on 3-month subscription. Product page presents a structurally different threshold-based gift mechanic (140 CHF spend) with no cross-reference to the original promise.</p>
+        <p><span class="ok">[confirmed — step 02 → 03]</span> Gift correctly applied in cart; Trustpilot rating carried through to checkout. Trust does not drop off at this seam.</p>
+        <p>Suggested fix: add one line on the product page explicitly confirming the homepage's specific offer, or remove the ambiguity by unifying the two mechanics.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section" id="cta">
+  <div class="wrap">
+    <h2>First audit is concierge-run, by hand — free.</h2>
+    <p>Send three URLs from your real funnel. You get a coherence score, cited findings, and one honest reaction: would you pay for this again.</p>
+    <div class="hero-ctas">
+      <a href="mailto:hello@funnelseams.example" class="cta-btn">Send your funnel →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>funnel/seams — connected funnel audit</div>
+    <div>Concierge phase · not yet self-serve</div>
+  </div>
+</footer>
+
+<script>
+  const revealEls = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  }, {threshold:0.15});
+  revealEls.forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
